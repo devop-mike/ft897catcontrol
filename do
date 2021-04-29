@@ -1,6 +1,17 @@
 #!/bin/sh
 serialport="/dev/serial0"
 tmploc="/var/tmp/"
+readdelay=0.75
+commanddelay=0.25
+
+readresponse() {
+  echo xxd -p -l ${1} ${serialport} \>${tmploc}${2}
+  xxd -p -l ${1} ${serialport} >${tmploc}${2} &
+  xxdpid=$!
+  sleep ${readdelay}
+  kill ${xxdpid}
+}
+
 docat() {
   while [ -n "$1" ]; do
     case "$1" in
@@ -11,16 +22,15 @@ docat() {
       exit
       ;;
     fix)
-      echo stty -F ${serialport} 38400 1:0:800008bf:0:0:0:0:0:0:5:1:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0
+      stty -gF ${serialport}
       stty -F ${serialport} 38400 1:0:800008bf:0:0:0:0:0:0:5:1:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0
+      stty -gF ${serialport}
       ;;
     get-freq)
       command="${0%/*}/commands/get-freq"
       echo Sending $(xxd -p ${command})
       cat ${command} >${serialport}
-      xxd -p -l 5 ${serialport} >${tmploc}catcon-get-freq &
-      sleep 2
-      killall xxd
+      readresponse 5 catcon-get-freq
       if [ -f ${tmploc}catcon-get-freq ]; then
         echo -n "$(cut -c1-3,4-8 --output-delimiter=. ${tmploc}catcon-get-freq) "
         mode=$(cut -c9-10 ${tmploc}catcon-get-freq)
@@ -65,9 +75,7 @@ docat() {
       command="${0%/*}/commands/read-rx-status"
       echo Sending $(xxd -p ${command})
       cat ${command} >${serialport}
-      xxd -p -l 1 ${serialport} >${tmploc}catcon-read-rx-status &
-      sleep 2
-      killall xxd
+      readresponse 1 catcon-read-rx-status
       if [ -f ${tmploc}catcon-read-rx-status ]; then
         echo "$(cat ${tmploc}catcon-read-rx-status)"
       fi
@@ -76,9 +84,7 @@ docat() {
       command="${0%/*}/commands/read-tx-status"
       echo Sending $(xxd -p ${command})
       cat ${command} >${serialport}
-      xxd -p -l 1 ${serialport} >${tmploc}catcon-read-tx-status &
-      sleep 2
-      killall xxd
+      readresponse 1 catcon-read-tx-status
       if [ -f ${tmploc}catcon-read-tx-status ]; then
         echo "$(cat ${tmploc}catcon-read-tx-status)"
       fi
@@ -112,7 +118,7 @@ docat() {
     esac
     shift
     if [ -n "$1" ]; then
-      sleep 1
+      sleep ${commanddelay}
     fi
   done
 }
