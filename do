@@ -1,14 +1,18 @@
 #!/bin/sh
 serialport="/dev/serial0"
 tmploc="/var/tmp/"
-readdelay=0.75
+readdelay=2.75
 commanddelay=0.25
 
 readresponse() {
-  echo xxd -p -l ${1} ${serialport} \>${tmploc}${2}
+  # test -f ${0%/*}/debug && echo xxd -p -l ${1} ${serialport} \>${tmploc}${2}
+  # cat ${serialport} | xxd -p -l ${1} >${tmploc}${2} &
   xxd -p -l ${1} ${serialport} >${tmploc}${2} &
   xxdpid=$!
+  # test -f ${0%/*}/debug && ps fx
+  # test -f ${0%/*}/debug && echo ${xxdpid}
   sleep ${readdelay}
+  # test -f ${0%/*}/debug && ps -ho pid,lstart,cmd ${xxdpid}
   kill ${xxdpid}
 }
 
@@ -22,9 +26,7 @@ docat() {
       exit
       ;;
     fix)
-      stty -gF ${serialport}
       stty -F ${serialport} 38400 1:0:800008bf:0:0:0:0:0:0:5:1:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0
-      stty -gF ${serialport}
       ;;
     get-freq)
       command="${0%/*}/commands/get-freq"
