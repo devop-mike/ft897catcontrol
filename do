@@ -20,8 +20,13 @@ docat() {
   while [ -n "$1" ]; do
     case "$1" in
     l | ls | list)
+      echo commands
       for file in ${0%/*}/commands/*; do
         echo "$(xxd -p $file) ${file##*/}"
+      done
+      echo scripts
+      for file in ${0%/*}/scripts/*; do
+        echo "${file##*/}\t\t$(cat $file)"
       done
       exit
       ;;
