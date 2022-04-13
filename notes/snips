@@ -1,0 +1,5 @@
+  # test -f ${0%/*}/debug && echo xxd -p -l ${1} ${serialport} \>${tmploc}${2}
+  # cat ${serialport} | xxd -p -l ${1} >${tmploc}${2} &
+  # test -f ${0%/*}/debug && ps fx
+  # test -f ${0%/*}/debug && echo ${xxdpid}
+  # test -f ${0%/*}/debug && ps -ho pid,lstart,cmd ${xxdpid}

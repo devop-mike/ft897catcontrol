@@ -1,19 +1,17 @@
 #!/bin/sh
 serialport="/dev/serial0"
 tmploc="/var/tmp/"
-readdelay=2.75
+readdelay=1.75
 commanddelay=0.25
 
 readresponse() {
-  # test -f ${0%/*}/debug && echo xxd -p -l ${1} ${serialport} \>${tmploc}${2}
-  # cat ${serialport} | xxd -p -l ${1} >${tmploc}${2} &
   xxd -p -l ${1} ${serialport} >${tmploc}${2} &
   xxdpid=$!
-  # test -f ${0%/*}/debug && ps fx
-  # test -f ${0%/*}/debug && echo ${xxdpid}
-  sleep ${readdelay}
-  # test -f ${0%/*}/debug && ps -ho pid,lstart,cmd ${xxdpid}
-  kill ${xxdpid}
+
+  echo Sending $(xxd -p ${3})
+  cat ${3} >${serialport}
+
+  wait ${xxdpid}
 }
 
 docat() {
@@ -35,9 +33,9 @@ docat() {
       ;;
     get-freq)
       command="${0%/*}/commands/get-freq"
-      echo Sending $(xxd -p ${command})
-      cat ${command} >${serialport}
-      readresponse 5 catcon-get-freq
+      # echo Sending $(xxd -p ${command})
+      # cat ${command} >${serialport}
+      readresponse 5 catcon-get-freq ${command}
       if [ -f ${tmploc}catcon-get-freq ]; then
         echo -n "$(cut -c1-3,4-8 --output-delimiter=. ${tmploc}catcon-get-freq) "
         mode=$(cut -c9-10 ${tmploc}catcon-get-freq)
@@ -80,18 +78,18 @@ docat() {
       ;;
     read-rx-status)
       command="${0%/*}/commands/read-rx-status"
-      echo Sending $(xxd -p ${command})
-      cat ${command} >${serialport}
-      readresponse 1 catcon-read-rx-status
+      # echo Sending $(xxd -p ${command})
+      # cat ${command} >${serialport}
+      readresponse 1 catcon-read-rx-status ${command}
       if [ -f ${tmploc}catcon-read-rx-status ]; then
         echo "$(cat ${tmploc}catcon-read-rx-status)"
       fi
       ;;
     read-tx-status)
       command="${0%/*}/commands/read-tx-status"
-      echo Sending $(xxd -p ${command})
-      cat ${command} >${serialport}
-      readresponse 1 catcon-read-tx-status
+      # echo Sending $(xxd -p ${command})
+      # cat ${command} >${serialport}
+      readresponse 1 catcon-read-tx-status ${command}
       if [ -f ${tmploc}catcon-read-tx-status ]; then
         echo "$(cat ${tmploc}catcon-read-tx-status)"
       fi
