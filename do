@@ -1,11 +1,11 @@
 #!/bin/sh
 serialport="/dev/serial0"
 tmploc="/var/tmp/"
-readdelay=1.75
+readdelay=2.5
 commanddelay=0.25
 
 readresponse() {
-  xxd -p -l ${1} ${serialport} >${tmploc}${2} &
+  timeout ${readdelay}s xxd -p -l ${1} ${serialport} >${tmploc}${2} &
   xxdpid=$!
 
   echo Sending $(xxd -p ${3})
