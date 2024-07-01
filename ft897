@@ -4,6 +4,9 @@ tmploc="/var/tmp/"
 readdelay=2.5
 commanddelay=0.25
 
+realpath="$(realpath $0)"
+realpath="${realpath%/*}"
+
 readresponse() {
   timeout ${readdelay}s xxd -p -l ${1} ${serialport} >${tmploc}${2} &
   xxdpid=$!
@@ -16,14 +19,14 @@ readresponse() {
 
 listcommands() {
   echo commands
-  for file in ${0%/*}/commands/*; do
+  for file in ${realpath}/commands/*; do
     echo "$(xxd -p $file) ${file##*/}"
   done
 }
 
 listscripts() {
   echo scripts
-  for file in ${0%/*}/scripts/*; do
+  for file in ${realpath}/scripts/*; do
     echo "${file##*/}\t\t$(cat $file)"
   done
 }
@@ -48,7 +51,7 @@ docat() {
       stty -F ${serialport} 38400 1:0:800008bf:0:0:0:0:0:0:5:1:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0
       ;;
     get-freq)
-      command="${0%/*}/commands/get-freq"
+      command="${realpath}/commands/get-freq"
       # echo Sending $(xxd -p ${command})
       # cat ${command} >${serialport}
       readresponse 5 catcon-get-freq ${command}
@@ -93,7 +96,7 @@ docat() {
       fi
       ;;
     read-rx-status)
-      command="${0%/*}/commands/read-rx-status"
+      command="${realpath}/commands/read-rx-status"
       # echo Sending $(xxd -p ${command})
       # cat ${command} >${serialport}
       readresponse 1 catcon-read-rx-status ${command}
@@ -102,7 +105,7 @@ docat() {
       fi
       ;;
     read-tx-status)
-      command="${0%/*}/commands/read-tx-status"
+      command="${realpath}/commands/read-tx-status"
       # echo Sending $(xxd -p ${command})
       # cat ${command} >${serialport}
       readresponse 1 catcon-read-tx-status ${command}
@@ -140,12 +143,12 @@ docat() {
       echo ${command} | xxd -r -p >${serialport}
       ;;
     *)
-      command="${0%/*}/commands/$1"
+      command="${realpath}/commands/$1"
       if [ -f ${command} ]; then
         echo Sending $(xxd -p ${command})
         cat ${command} >${serialport}
       else
-        script="${0%/*}/scripts/$1"
+        script="${realpath}/scripts/$1"
         if [ -f ${script} ]; then
           docat $(cat ${script})
         fi
@@ -159,4 +162,8 @@ docat() {
   done
 }
 
-docat $*
+if [ -z "$*" ]; then
+  docat get-freq
+else
+  docat $@
+fi
