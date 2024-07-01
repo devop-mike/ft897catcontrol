@@ -14,18 +14,34 @@ readresponse() {
   wait ${xxdpid}
 }
 
+listcommands() {
+  echo commands
+  for file in ${0%/*}/commands/*; do
+    echo "$(xxd -p $file) ${file##*/}"
+  done
+}
+
+listscripts() {
+  echo scripts
+  for file in ${0%/*}/scripts/*; do
+    echo "${file##*/}\t\t$(cat $file)"
+  done
+}
+
 docat() {
   while [ -n "$1" ]; do
     case "$1" in
     l | ls | list)
-      echo commands
-      for file in ${0%/*}/commands/*; do
-        echo "$(xxd -p $file) ${file##*/}"
-      done
-      echo scripts
-      for file in ${0%/*}/scripts/*; do
-        echo "${file##*/}\t\t$(cat $file)"
-      done
+      listcommands
+      listscripts
+      exit
+      ;;
+    c)
+      listcommands
+      exit
+      ;;
+    s)
+      listscripts
       exit
       ;;
     fix)
@@ -107,6 +123,21 @@ docat() {
         fi
         shift
       fi
+      ;;
+    set-clar)
+      if [ "$2" = "+" ]; then
+        command="0000"
+      fi
+      if [ "$2" = "-" ]; then
+        command="0100"
+      fi
+      freq="0000"
+      if [ $3 -gt 0 ]; then
+        freq="$(printf "%04i" $3)"
+      fi
+      command="${command}${freq}f5"
+      echo Sendig $(echo ${command} | xxd -r -p | xxd -p)
+      echo ${command} | xxd -r -p >${serialport}
       ;;
     *)
       command="${0%/*}/commands/$1"
