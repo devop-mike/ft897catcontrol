@@ -1,39 +1,174 @@
-#!/bin/sh
-serialport="/dev/serial0"
-tmploc="/var/tmp/"
-readdelay=2.5
-commanddelay=0.25
+#!/bin/bash
 
-realpath="$(realpath $0)"
-realpath="${realpath%/*}"
+scriptinit() {
+  serialport="/dev/serial0"
+  readdelay=2.5
+  commanddelay=0.25
 
-readresponse() {
-  timeout ${readdelay}s xxd -p -l ${1} ${serialport} >${tmploc}${2} &
-  xxdpid=$!
+  realpath="$(realpath ${0})"
+  conffile="${realpath}.conf"
+  workingdir="${realpath%/*}"
 
-  echo Sending $(xxd -p ${3})
-  cat ${3} >${serialport}
+  declare -g -A modes=(
+    "00" "LSB"
+    "01" "USB"
+    "02" "CW"
+    "03" "CWR"
+    "04" "AM"
+    "06" "WFM"
+    "08" "FM"
+    "88" "FMN"
+    "0a" "DIG"
+    "0c" "PKT"
+  )
 
-  wait ${xxdpid}
+  if [ -f ${conffile} ]; then
+    . ${conffile}
+  fi
 }
 
 listcommands() {
   echo commands
-  for file in ${realpath}/commands/*; do
+  for file in ${workingdir}/commands/*; do
     echo "$(xxd -p $file) ${file##*/}"
   done
 }
 
 listscripts() {
   echo scripts
-  for file in ${realpath}/scripts/*; do
+  for file in ${workingdir}/scripts/*; do
     echo "${file##*/}\t\t$(cat $file)"
   done
 }
 
+fixserialportsetting() {
+  stty -F ${serialport} 38400 1:0:800008bf:0:0:0:0:0:0:5:1:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0
+}
+
+readresponse() {
+  (
+    timeout ${readdelay}s xxd -p -l ${1} <${serialport} &
+    cat ${2} >${serialport}
+  )
+}
+
+getfreq() {
+  readresponse 5 ${workingdir}/commands/get-freq
+}
+
+getrxstatus() {
+  readresponse 1 ${workingdir}/commands/read-rx-status
+}
+
+gettxstatus() {
+  readresponse 1 ${workingdir}/commands/read-tx-status
+}
+
+displayfreq() {
+  if [ -n "${1}" ]; then
+    echo "${1:0:3}.${1:3:5} ${1:8:2} ${modes[${1:8:2}]}"
+  fi
+}
+
+displayrxstatus() { #-a "${1}" != "ff"
+  echo "rxstatus=${1}=$((0x${1}))"
+  if [ -n "${1}" ]; then
+    val=$((0x${1}))
+    if [ ${val} -ne 255 ]; then
+      echo "smeter=$((0x${1} & 0xf))"
+    fi
+  fi
+}
+
+displaytxstatus() {
+  echo "txstatus=${1}=$((0x${1}))"
+  if [ -n "${1}" ]; then
+    val=$((0x${1}))
+    if [ ${val} -ne 255 ]; then
+      echo "pmeter=$((0x${1} & 0xf))"
+    fi
+  fi
+}
+
+displaystatus() {
+  displayfreq $(getfreq)
+  displayrxstatus $(getrxstatus)
+  displaytxstatus $(gettxstatus)
+}
+
+setfreq() {
+  if [ -n "${1}" ]; then
+    local freq keyed="${1}"
+
+    case "${#keyed}" in
+
+    4) keyed="${keyed}0" ;&
+    3 | 5)
+      if [ -z "${megs}" ]; then
+        local curfreq=$(getfreq)
+        megs="${curfreq:0:3}"
+      fi
+      freq="${megs}${keyed}"
+      ;;
+
+    7) keyed="${keyed}0" ;&
+    6 | 8)
+      megs="${keyed:0:3}"
+      freq="${keyed}"
+      ;;
+
+    esac
+
+    if [ -n "${freq}" ]; then
+      if [ ${#freq} -eq 6 ]; then
+        freq="${freq}00"
+      fi
+      echo "freq=${freq}"
+      echo "${freq}01" | xxd -r -p >${serialport}
+    fi
+  fi
+}
+
+# setclar() {
+# }
+
+readline() {
+  (
+    if [ -n "${1}" ]; then
+      megs="${1}"
+    fi
+    if [ -z "${1}" ]; then
+      megs=$(getfreq | cut -c-3)
+    fi
+    if [ -z "${megs}" ]; then
+      exit
+    fi
+    while read keyed; do
+      case "${#keyed}" in
+
+      4) keyed="${keyed}0" ;&
+      3 | 5) freq="${megs}${keyed}" ;;
+
+      7) keyed="${keyed}0" ;&
+      6 | 8)
+        megs="${keyed:0:3}"
+        freq="${keyed}"
+        ;;
+
+      *) continue ;;
+      esac
+      setfreq ${freq}
+    done
+  )
+}
+
+debug() {
+  echo "debug"
+}
+
 docat() {
-  while [ -n "$1" ]; do
-    case "$1" in
+  while [ -n "${1}" ]; do
+    case "${1}" in
     l | ls | list)
       listcommands
       listscripts
@@ -47,108 +182,46 @@ docat() {
       listscripts
       exit
       ;;
-    fix)
-      stty -F ${serialport} 38400 1:0:800008bf:0:0:0:0:0:0:5:1:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0
-      ;;
-    get-freq)
-      command="${realpath}/commands/get-freq"
-      # echo Sending $(xxd -p ${command})
-      # cat ${command} >${serialport}
-      readresponse 5 catcon-get-freq ${command}
-      if [ -f ${tmploc}catcon-get-freq ]; then
-        echo -n "$(cut -c1-3,4-8 --output-delimiter=. ${tmploc}catcon-get-freq) "
-        mode=$(cut -c9-10 ${tmploc}catcon-get-freq)
-        case "$mode" in
-        00)
-          echo LSB
-          ;;
-        01)
-          echo USB
-          ;;
-        02)
-          echo CW
-          ;;
-        03)
-          echo CWR
-          ;;
-        04)
-          echo AM
-          ;;
-        06)
-          echo WFM
-          ;;
-        08)
-          echo FM
-          ;;
-        88)
-          echo FMN
-          ;;
-        0a)
-          echo DIG
-          ;;
-        0c)
-          echo PKT
-          ;;
-        *)
-          echo $mode
-          ;;
-        esac
-      fi
-      ;;
-    read-rx-status)
-      command="${realpath}/commands/read-rx-status"
-      # echo Sending $(xxd -p ${command})
-      # cat ${command} >${serialport}
-      readresponse 1 catcon-read-rx-status ${command}
-      if [ -f ${tmploc}catcon-read-rx-status ]; then
-        echo "$(cat ${tmploc}catcon-read-rx-status)"
-      fi
-      ;;
-    read-tx-status)
-      command="${realpath}/commands/read-tx-status"
-      # echo Sending $(xxd -p ${command})
-      # cat ${command} >${serialport}
-      readresponse 1 catcon-read-tx-status ${command}
-      if [ -f ${tmploc}catcon-read-tx-status ]; then
-        echo "$(cat ${tmploc}catcon-read-tx-status)"
-      fi
-      ;;
+    fix) fixserialportsetting ;;
+    get-freq) displayfreq $(getfreq) ;;
+    get-status) displaystatus ;;
+    read-rx-status) displayrxstatus $(getrxstatus) ;;
+    read-tx-status) displayrxstatus $(gettxstatus) ;;
     set-freq)
-      if [ -n "$2" -a $2 -gt 0 ]; then
-        command="$2"
-        if [ ${#command} -eq 6 ]; then
-          command="${command}00"
-        fi
-        if [ ${#command} -eq 8 ]; then
-          command="${command}01"
-          echo Sendig $(echo ${command} | xxd -r -p | xxd -p)
-          echo ${command} | xxd -r -p >${serialport}
-        fi
+      if [ -n "${2}" -a ${2} -gt 0 ]; then
+        setfreq "${2}"
         shift
       fi
       ;;
     set-clar)
-      if [ "$2" = "+" ]; then
+      if [ "${2}" = "+" ]; then
         command="0000"
       fi
-      if [ "$2" = "-" ]; then
+      if [ "${2}" = "-" ]; then
         command="0100"
       fi
       freq="0000"
-      if [ $3 -gt 0 ]; then
-        freq="$(printf "%04i" $3)"
+      if [ ${3} -gt 0 ]; then
+        freq="$(printf "%04i" ${3})"
       fi
       command="${command}${freq}f5"
       echo Sendig $(echo ${command} | xxd -r -p | xxd -p)
       echo ${command} | xxd -r -p >${serialport}
       ;;
+    r | readline)
+      readline ${2}
+      if [ -n "${2}" ]; then
+        shift
+      fi
+      ;;
+    debug) debug ;;
     *)
-      command="${realpath}/commands/$1"
+      command="${workingdir}/commands/${1}"
       if [ -f ${command} ]; then
         echo Sending $(xxd -p ${command})
         cat ${command} >${serialport}
       else
-        script="${realpath}/scripts/$1"
+        script="${workingdir}/scripts/${1}"
         if [ -f ${script} ]; then
           docat $(cat ${script})
         fi
@@ -156,14 +229,15 @@ docat() {
       ;;
     esac
     shift
-    if [ -n "$1" ]; then
+    if [ -n "${1}" ]; then
       sleep ${commanddelay}
     fi
   done
 }
 
+scriptinit
 if [ -z "$*" ]; then
-  docat get-freq
+  displaystatus
 else
   docat $@
 fi
