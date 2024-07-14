@@ -46,9 +46,7 @@ fixserialportsetting() {
 }
 
 sendcommand() {
-  echo "send command ${1}"
   echo "${1}" | xxd -r -p >${serialport}
-
 }
 
 readresponse() {
@@ -164,19 +162,19 @@ setclar() {
 }
 
 readline() {
-  (
-    displaystatus
-    while read keyed; do
+  displaystatus
+  while read keyed; do
+    if [ -n "${keyed}" ]; then
       case "${keyed}" in
       "*") displaystatus ;;
       *)
         setfreq "${keyed}"
-        # sleep 0.5
-        echo displaystatus
+        sleep ${commanddelay}
+        displaystatus
         ;;
       esac
-    done
-  )
+    fi
+  done
 }
 
 debug() {

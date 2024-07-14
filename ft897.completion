@@ -1,8 +1,13 @@
+_ft897_completion_commandpath=$(realpath ${BASH_SOURCE})
+_ft897_completion_commandpath="${_ft897_completion_commandpath%/*}"
 _ft897_completion() {
   local commandpath
   COMPREPLY=()
-  commandpath="${PWD}/${BASH_SOURCE%/*}"
-  commands=$(for d in ${commandpath}/{commands,scripts,bookmarks}; do cd ${d}; ls; done)
+  commandpath="${_ft897_completion_commandpath}"
+  commands=$(for d in ${commandpath}/{commands,scripts,bookmarks}; do
+    cd ${d}
+    ls
+  done)
   COMPREPLY=($(compgen -W "${commands[*]}" -- "${COMP_WORDS[COMP_CWORD]}"))
 }
 complete -F _ft897_completion ft897
