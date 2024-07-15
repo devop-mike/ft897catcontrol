@@ -4,10 +4,7 @@ _ft897_completion() {
   local commandpath
   COMPREPLY=()
   commandpath="${_ft897_completion_commandpath}"
-  commands=$(for d in ${commandpath}/{commands,scripts,bookmarks}; do
-    cd ${d}
-    ls
-  done)
+  commands=$(for f in $(find /home/mcoxon/dev/catcontrol/bash/{commands,scripts,bookmarks} -type f); do echo "${f##*/}"; done)
   COMPREPLY=($(compgen -W "${commands[*]}" -- "${COMP_WORDS[COMP_CWORD]}"))
 }
 complete -F _ft897_completion ft897

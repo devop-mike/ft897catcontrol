@@ -37,7 +37,17 @@ listcommands() {
 listscripts() {
   echo scripts
   for file in ${workingdir}/scripts/*; do
-    echo "${file##*/}\t\t$(cat $file)"
+    printf "%-14s %s\n" "${file##*/}" "$(cat $file)"
+  done
+}
+
+listbookmarks() {
+  for dir in $(find ${workingdir}/bookmarks -type d | sort); do
+    echo "${dir#${workingdir}/}"
+    for file in $(find ${dir} -maxdepth 1 -type f | sort); do
+      printf "    %-14s %s\n" "${file##*/}" "$(cat $file)"
+    done
+    echo
   done
 }
 
@@ -189,19 +199,26 @@ docat() {
       listscripts
       exit
       ;;
-    c)
+    lc)
       listcommands
       exit
       ;;
-    s)
+    ls)
       listscripts
       exit
       ;;
+    lb)
+      listbookmarks
+      exit
+      ;;
     fix) fixserialportsetting ;;
+
     get-freq) displayfreq $(getfreq) ;;
     get-status) displaystatus ;;
+
     read-rx-status) displayrxstatus $(getrxstatus) ;;
     read-tx-status) displayrxstatus $(gettxstatus) ;;
+
     set-freq)
       if [ -n "${2}" -a ${2} -gt 0 ]; then
         setfreq "${2}"
@@ -209,7 +226,9 @@ docat() {
       fi
       ;;
     set-clar) setclar "${2}" "${3}" ;;
+
     r | readline) readline ;;
+
     debug) debug ;;
     *)
       command="${workingdir}/commands/${1}"
@@ -218,7 +237,12 @@ docat() {
       else
         script="${workingdir}/scripts/${1}"
         if [ -f ${script} ]; then
+          echo "script: $(cat ${script})"
           docat $(cat ${script})
+        else
+          bookmark="$(find "${workingdir}/bookmarks" -type f -name "${1}" -exec cat {} \;)"
+          echo "bookmark: ${bookmark}"
+          docat ${bookmark}
         fi
       fi
       ;;
