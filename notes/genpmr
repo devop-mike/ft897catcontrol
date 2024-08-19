@@ -1,0 +1,2 @@
+for n in {01..16}; do echo "$n  $((((${n#0}-1)*12500)+446006250))"; done
+for n in {01..16}; do echo "set-freq $((((${n#0}-1)*1250)+44600625)) mode-fmn" > pmr/pmr$n; done

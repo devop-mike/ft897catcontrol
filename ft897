@@ -55,6 +55,12 @@ fixserialportsetting() {
   stty -F ${serialport} 38400 1:0:800008bf:0:0:0:0:0:0:5:1:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0
 }
 
+makefilename() {
+  local freq="$(getfreq)"
+  freq="${freq:0:8}0"
+  echo "$(date "+%Y%m%d.%H%M%S").${freq}"
+}
+
 sendcommand() {
   echo "${1}" | xxd -r -p >${serialport}
 }
@@ -177,6 +183,7 @@ readline() {
     if [ -n "${keyed}" ]; then
       case "${keyed}" in
       "*") displaystatus ;;
+      t) cat ${workingdir}/commands/toggle-vfo >${serialport} ;;
       *)
         setfreq "${keyed}"
         sleep ${commanddelay}
@@ -212,6 +219,7 @@ docat() {
       exit
       ;;
     fix) fixserialportsetting ;;
+    mkfn) makefilename ;;
 
     get-freq) displayfreq $(getfreq) ;;
     get-status) displaystatus ;;
